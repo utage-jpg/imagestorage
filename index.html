@@ -14,17 +14,14 @@
     max-width: 600px;
     margin: auto;
   }
-
   h1 {
     font-size: 20px;
     margin-bottom: 12px;
   }
-
   .desc {
     font-size: 13px;
     margin-bottom: 16px;
   }
-
   #tokenArea {
     margin-bottom: 20px;
     padding: 12px;
@@ -32,7 +29,6 @@
     border: 1px solid #ccc;
     border-radius: 6px;
   }
-
   #dropzone {
     border: 2px dashed #999;
     background: #fff;
@@ -42,15 +38,12 @@
     margin-bottom: 12px;
     transition: background 0.2s;
   }
-
   #dropzone.dragover {
     background: #e0f7ff;
   }
-
   #fileInput {
     display: none;
   }
-
   button {
     width: 100%;
     padding: 12px;
@@ -62,11 +55,9 @@
     cursor: pointer;
     margin-bottom: 12px;
   }
-
   button:disabled {
     background: #777;
   }
-
   #result {
     font-size: 13px;
     margin-top: 16px;
@@ -86,10 +77,11 @@
   一定時間後URLが発行されます。
 </p>
 
-<!-- 初回だけ表示 -->
+<!-- トークン入力欄（初回 & エラー時のみ表示） -->
 <div id="tokenArea" style="display:none;">
   <p style="margin:0 0 6px;">GitHub パーソナルアクセストークン（初回のみ）</p>
-  <input id="tokenInput" type="password" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;"
+  <input id="tokenInput" type="password"
+    style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;"
     placeholder="github_pat_..." />
   <button onclick="saveToken()">保存する</button>
 </div>
@@ -107,13 +99,14 @@
   const OWNER = "utage-jpg";
   const REPO = "imagestorage";
   const BRANCH = "main";
-  const FOLDER = "";
+  const FOLDER = ""; // ルート
 
   let selectedFile = null;
 
-  // --- トークン管理 ---
+  // ===== トークン管理（初回 or エラー時に表示） =====
   const savedToken = localStorage.getItem("github_token");
   const tokenArea = document.getElementById("tokenArea");
+
   if (!savedToken) tokenArea.style.display = "block";
 
   function saveToken() {
@@ -123,31 +116,25 @@
     tokenArea.style.display = "none";
   }
 
-  // --- ドラッグ＆ドロップ ---
+  // ===== ドラッグ＆ドロップ処理 =====
   const dropzone = document.getElementById("dropzone");
   const fileInput = document.getElementById("fileInput");
   const uploadBtn = document.getElementById("uploadBtn");
 
   dropzone.addEventListener("click", () => fileInput.click());
-
   dropzone.addEventListener("dragover", (e) => {
     e.preventDefault();
     dropzone.classList.add("dragover");
   });
-
   dropzone.addEventListener("dragleave", () => {
     dropzone.classList.remove("dragover");
   });
-
   dropzone.addEventListener("drop", (e) => {
     e.preventDefault();
     dropzone.classList.remove("dragover");
     handleFiles(e.dataTransfer.files);
   });
-
-  fileInput.addEventListener("change", (e) => {
-    handleFiles(e.target.files);
-  });
+  fileInput.addEventListener("change", (e) => handleFiles(e.target.files));
 
   function handleFiles(files) {
     if (!files.length) return;
@@ -156,30 +143,32 @@
     dropzone.innerHTML = `<p>${selectedFile.name}</p>`;
   }
 
-  // --- Base64変換 ---
+  // ===== Base64変換 =====
   function arrayBufferToBase64(buffer) {
     let binary = "";
     const bytes = new Uint8Array(buffer);
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
     return btoa(binary);
   }
 
-  // --- アップロード ---
+  // ===== GitHub PUT API（エラー時はトークン削除して再表示） =====
   uploadBtn.addEventListener("click", async () => {
     const token = localStorage.getItem("github_token");
-    if (!token) return alert("トークンがありません（初回設定してください）");
+    if (!token) return forceTokenReset("トークンがありません。再入力してください。");
     if (!selectedFile) return alert("ファイルが選択されていません");
 
     uploadBtn.disabled = true;
     uploadBtn.textContent = "アップロード中…";
 
     try {
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const base64Content = arrayBufferToBase64(arrayBuffer);
+      const buffer = await selectedFile.arrayBuffer();
+      const base64Content = arrayBufferToBase64(buffer);
 
       const path = FOLDER + selectedFile.name;
 
-      const res = await fetch(
+      const response = await fetch(
         `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`,
         {
           method: "PUT",
@@ -188,17 +177,22 @@
             "Accept": "application/vnd.github+json"
           },
           body: JSON.stringify({
-            message: `Upload via Simple Tool: ${selectedFile.name}`,
+            message: `Upload: ${selectedFile.name}`,
             content: base64Content,
             branch: BRANCH
           })
         }
       );
 
-      if (!res.ok) {
+      // ---- 401（認証エラー）なら自動的にトークン入力欄へ戻す ----
+      if (response.status === 401 || response.status === 403) {
+        return forceTokenReset("トークンが無効です。再設定してください。");
+      }
+
+      if (!response.ok) {
         uploadBtn.disabled = false;
         uploadBtn.textContent = "URL発行";
-        return alert("アップロードに失敗しました。トークン権限を確認してください。");
+        return alert("アップロードに失敗しました。");
       }
 
       showResult(selectedFile.name);
@@ -212,14 +206,23 @@
     uploadBtn.textContent = "URL発行";
   });
 
-  // --- 結果表示（GitHub Pages URL のみ） ---
+  // ===== トークン削除＋再表示 =====
+  function forceTokenReset(msg) {
+    localStorage.removeItem("github_token");
+    tokenArea.style.display = "block";
+    alert(msg);
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = "URL発行";
+  }
+
+  // ===== Raw URL のみ（?raw=1 付き） =====
   function showResult(filename) {
-    const pages = `https://${OWNER}.github.io/${REPO}/${filename}`;
+    const raw = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${filename}?raw=1`;
 
     const box = document.getElementById("result");
     box.style.display = "block";
     box.innerHTML = `
-      <div><strong>URL:</strong><br>${pages}</div>
+      <div><strong>URL:</strong><br>${raw}</div>
     `;
   }
 </script>
