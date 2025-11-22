@@ -3,40 +3,87 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>GitHub ファイルURLメーカー</title>
+<title>ファイル共有＆変換ツール</title>
 <style>
   body {
     margin: 0;
     padding: 24px;
-    font-family: sans-serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     background: #fafafa;
     color: #222;
-    max-width: 600px;
+    max-width: 960px;
     margin: auto;
   }
   h1 {
-    font-size: 20px;
-    margin-bottom: 12px;
+    font-size: 22px;
+    margin-bottom: 4px;
   }
-  .desc {
+  .subtitle {
     font-size: 13px;
+    color: #555;
     margin-bottom: 16px;
   }
-  #tokenArea {
-    margin-bottom: 20px;
-    padding: 12px;
+  h2 {
+    font-size: 18px;
+    margin: 24px 0 8px;
+    border-top: 1px solid #ddd;
+    padding-top: 16px;
+  }
+  h3 {
+    font-size: 14px;
+    margin: 12px 0 6px;
+  }
+  .section-desc {
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 12px;
+  }
+  .box {
     background: #fff;
-    border: 1px solid #ccc;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  #tokenArea {
+    margin-bottom: 12px;
+  }
+  #tokenArea p {
+    margin: 0 0 6px;
+    font-size: 13px;
+  }
+  #tokenInput {
+    width: 100%;
+    padding: 8px;
     border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  .btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    background: #222;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .btn:disabled {
+    background: #777;
+    cursor: default;
   }
   #dropzone {
     border: 2px dashed #999;
     background: #fff;
-    padding: 40px 20px;
+    padding: 32px 16px;
     text-align: center;
     border-radius: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     transition: background 0.2s;
+    font-size: 13px;
+    color: #555;
   }
   #dropzone.dragover {
     background: #e0f7ff;
@@ -44,82 +91,186 @@
   #fileInput {
     display: none;
   }
-  button {
-    width: 100%;
-    padding: 12px;
-    border: none;
-    background: #222;
-    color: #fff;
-    border-radius: 6px;
-    font-size: 14px;
-    cursor: pointer;
-    margin-bottom: 12px;
-  }
-  button:disabled {
-    background: #777;
-  }
-  #result {
+  #uploadResult {
     font-size: 13px;
-    margin-top: 16px;
-    padding: 12px;
+    margin-top: 10px;
+    padding: 10px;
     background: #fff;
-    border: 1px solid #ccc;
+    border: 1px solid #ddd;
+    border-radius: 6px;
     display: none;
     word-break: break-all;
+  }
+  .url-label {
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  .loader {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #555;
+  }
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #ccc;
+    border-top-color: #222;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .note {
+    font-size: 11px;
+    color: #777;
+    margin-top: 4px;
+  }
+
+  /* 変換ツール共通 */
+  .row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .row > * {
+    flex: 1;
+  }
+  .small-btn {
+    width: 100%;
+    padding: 8px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    background: #222;
+    color: #fff;
+    cursor: pointer;
+  }
+  .small-btn:disabled {
+    background: #777;
+  }
+  .file-label {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  .status-text {
+    font-size: 12px;
+    color: #555;
+    margin-top: 6px;
   }
 </style>
 </head>
 <body>
 
-<h1>GitHub ファイルURLメーカー</h1>
-<p class="desc">
+<h1>ファイル共有＆変換ツール</h1>
+<p class="subtitle">
+  GitHub へのアップロード用URL発行と、PDF⇄画像の変換をまとめて行えるツールです。
+</p>
+
+<!-- ===================== セクション1：GitHubアップロード ===================== -->
+<h2>【1】GitHub アップロード＆URL発行</h2>
+<p class="section-desc">
   ファイルをドラッグ＆ドロップ、またはクリックして選択してください。<br>
   一定時間後URLが発行されます。
 </p>
 
-<!-- トークン入力欄（初回 & エラー時のみ表示） -->
-<div id="tokenArea" style="display:none;">
-  <p style="margin:0 0 6px;">GitHub パーソナルアクセストークン（初回のみ）</p>
-  <input id="tokenInput" type="password"
-    style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;"
-    placeholder="github_pat_..." />
-  <button onclick="saveToken()">保存する</button>
+<div class="box">
+
+  <!-- トークン入力欄（初回＆エラー時） -->
+  <div id="tokenArea" style="display:none;">
+    <p>GitHub パーソナルアクセストークン（初回のみ）</p>
+    <input id="tokenInput" type="password" placeholder="github_pat_..." />
+    <button class="btn" onclick="saveToken()">保存する</button>
+    <div class="note">
+      ※ Fine-grained token で、対象リポジトリを <code>imagestorage</code>、<br>
+      Repository permissions の Contents を「Read and write」に設定してください。
+    </div>
+  </div>
+
+  <!-- ドロップゾーン -->
+  <div id="dropzone">
+    <p>ここにファイルをドロップ<br>またはクリックして選択</p>
+    <input id="fileInput" type="file" />
+  </div>
+
+  <button id="uploadBtn" class="btn" disabled>URL発行</button>
+
+  <div id="uploadResult"></div>
 </div>
 
-<div id="dropzone">
-  <p>ここにファイルをドロップ<br>またはクリックして選択</p>
-  <input id="fileInput" type="file" />
+<!-- ===================== セクション2：PDF → JPEG ===================== -->
+<h2>【2】PDF → JPEG（全ページ）</h2>
+<p class="section-desc">
+  ローカルのPDFファイルをJPEG画像（各ページ）に変換し、<br>
+  ページごとに個別の画像ファイルとしてダウンロードします。
+</p>
+
+<div class="box">
+  <div class="file-label">PDFファイルを選択</div>
+  <div class="row">
+    <input id="pdfToJpegInput" type="file" accept="application/pdf" />
+    <button id="pdfToJpegBtn" class="small-btn">JPEGに変換（ページごと保存）</button>
+  </div>
+  <div id="pdfToJpegStatus" class="status-text"></div>
 </div>
 
-<button id="uploadBtn" disabled>URL発行</button>
+<!-- ===================== セクション3：画像 → PDF ===================== -->
+<h2>【3】画像（JPEG/PNGなど） → PDF</h2>
+<p class="section-desc">
+  画像ファイルを複数選び、1つのPDFファイルにまとめてダウンロードします。
+</p>
 
-<div id="result"></div>
+<div class="box">
+  <div class="file-label">画像ファイルを選択（複数可）</div>
+  <div class="row">
+    <input id="imgToPdfInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple />
+    <button id="imgToPdfBtn" class="small-btn">PDFに変換</button>
+  </div>
+  <div id="imgToPdfStatus" class="status-text"></div>
+</div>
+
+<!-- ===================== 外部ライブラリ ===================== -->
+<!-- pdf.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
+  // ===================== 共通設定 =====================
   const OWNER = "utage-jpg";
   const REPO = "imagestorage";
   const BRANCH = "main";
-  const FOLDER = ""; // ルート
+  const FOLDER = ""; // ルート直下
 
+  // pdf.js worker設定
+  if (window['pdfjsLib']) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+
+  // ===================== GitHub アップロード機能 =====================
   let selectedFile = null;
 
-  // ===== トークン管理（初回 or エラー時に表示） =====
-  const savedToken = localStorage.getItem("github_token");
   const tokenArea = document.getElementById("tokenArea");
-
+  const savedToken = localStorage.getItem("github_token");
   if (!savedToken) tokenArea.style.display = "block";
 
   function saveToken() {
     const token = document.getElementById("tokenInput").value.trim();
-    if (!token) return alert("トークンを入力してください");
+    if (!token) return alert("トークンを入力してください。");
     localStorage.setItem("github_token", token);
     tokenArea.style.display = "none";
   }
 
-  // ===== ドラッグ＆ドロップ処理 =====
   const dropzone = document.getElementById("dropzone");
   const fileInput = document.getElementById("fileInput");
   const uploadBtn = document.getElementById("uploadBtn");
+  const uploadResult = document.getElementById("uploadResult");
 
   dropzone.addEventListener("click", () => fileInput.click());
   dropzone.addEventListener("dragover", (e) => {
@@ -132,18 +283,17 @@
   dropzone.addEventListener("drop", (e) => {
     e.preventDefault();
     dropzone.classList.remove("dragover");
-    handleFiles(e.dataTransfer.files);
+    handleUploadFiles(e.dataTransfer.files);
   });
-  fileInput.addEventListener("change", (e) => handleFiles(e.target.files));
+  fileInput.addEventListener("change", (e) => handleUploadFiles(e.target.files));
 
-  function handleFiles(files) {
+  function handleUploadFiles(files) {
     if (!files.length) return;
     selectedFile = files[0];
     uploadBtn.disabled = false;
     dropzone.innerHTML = `<p>${selectedFile.name}</p>`;
   }
 
-  // ===== Base64変換 =====
   function arrayBufferToBase64(buffer) {
     let binary = "";
     const bytes = new Uint8Array(buffer);
@@ -153,23 +303,24 @@
     return btoa(binary);
   }
 
-  // ===== GitHub PUT API（エラー時はトークン削除して再表示） =====
   uploadBtn.addEventListener("click", async () => {
     const token = localStorage.getItem("github_token");
     if (!token) return forceTokenReset("トークンがありません。再入力してください。");
-    if (!selectedFile) return alert("ファイルが選択されていません");
+    if (!selectedFile) return alert("ファイルが選択されていません。");
 
     uploadBtn.disabled = true;
     uploadBtn.textContent = "アップロード中…";
+    uploadResult.style.display = "none";
+    uploadResult.innerHTML = "";
 
     try {
       const buffer = await selectedFile.arrayBuffer();
       const base64Content = arrayBufferToBase64(buffer);
+      const filename = selectedFile.name;
+      const path = FOLDER + filename;
 
-      const path = FOLDER + selectedFile.name;
-
-      const response = await fetch(
-        `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`,
+      const res = await fetch(
+        `https://api.github.com/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(path)}`,
         {
           method: "PUT",
           headers: {
@@ -177,28 +328,35 @@
             "Accept": "application/vnd.github+json"
           },
           body: JSON.stringify({
-            message: `Upload: ${selectedFile.name}`,
+            message: `Upload: ${filename}`,
             content: base64Content,
             branch: BRANCH
           })
         }
       );
 
-      // ---- 401（認証エラー）なら自動的にトークン入力欄へ戻す ----
-      if (response.status === 401 || response.status === 403) {
+      if (res.status === 401 || res.status === 403) {
         return forceTokenReset("トークンが無効です。再設定してください。");
       }
 
-      if (!response.ok) {
+      if (!res.ok) {
         uploadBtn.disabled = false;
         uploadBtn.textContent = "URL発行";
-        return alert("アップロードに失敗しました。");
+        return alert("アップロードに失敗しました。ファイル名の重複や権限を確認してください。");
       }
 
-      showResult(selectedFile.name);
+      // 成功時：拡張子でPDFかどうか判定
+      const lowerName = filename.toLowerCase();
+      const isPdf = lowerName.endsWith(".pdf");
+
+      if (isPdf) {
+        showPdfPagesUrl(filename);
+      } else {
+        showRawUrl(filename);
+      }
 
     } catch (e) {
-      alert("エラーが発生しました");
+      alert("アップロード中にエラーが発生しました。");
       console.error(e);
     }
 
@@ -206,7 +364,6 @@
     uploadBtn.textContent = "URL発行";
   });
 
-  // ===== トークン削除＋再表示 =====
   function forceTokenReset(msg) {
     localStorage.removeItem("github_token");
     tokenArea.style.display = "block";
@@ -215,15 +372,201 @@
     uploadBtn.textContent = "URL発行";
   }
 
-  // ===== Raw URL のみ（?raw=1 付き） =====
-  function showResult(filename) {
-    const raw = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${filename}?raw=1`;
-
-    const box = document.getElementById("result");
-    box.style.display = "block";
-    box.innerHTML = `
-      <div><strong>URL:</strong><br>${raw}</div>
+  function showRawUrl(filename) {
+    const raw = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${encodeURIComponent(filename)}?raw=1`;
+    uploadResult.style.display = "block";
+    uploadResult.innerHTML = `
+      <div class="url-label">URL:</div>
+      <div>${raw}</div>
+      <div class="note">※ 画像ファイルはこのURLで即時表示できます。</div>
     `;
+  }
+
+  function showPdfPagesUrl(filename) {
+    const pagesUrl = `https://${OWNER}.github.io/${REPO}/${encodeURIComponent(filename)}`;
+    uploadResult.style.display = "block";
+    uploadResult.innerHTML = `
+      <div class="url-label">URL（PDF表示用）:</div>
+      <div>${pagesUrl}</div>
+      <div class="loader" id="pdfLoader">
+        <div class="spinner"></div>
+        <div>GitHub Pages に反映中です… 数秒〜十数秒かかる場合があります。</div>
+      </div>
+      <div class="note" id="pdfCheckNote">自動で反映状況をチェックします。</div>
+    `;
+
+    // 反映チェック
+    let attempts = 0;
+    const maxAttempts = 12; // 約1分想定
+    const loaderEl = document.getElementById("pdfLoader");
+    const noteEl = document.getElementById("pdfCheckNote");
+
+    const check = async () => {
+      try {
+        const res = await fetch(pagesUrl, { method: "HEAD" });
+        if (res.ok) {
+          if (loaderEl) loaderEl.style.display = "none";
+          if (noteEl) {
+            noteEl.textContent = "PDFが開けるようになりました。上のURLをクリックして開いてください。";
+          }
+          return;
+        }
+      } catch (e) {
+        // 無視してリトライ
+      }
+      attempts++;
+      if (attempts < maxAttempts) {
+        setTimeout(check, 5000);
+      } else {
+        if (loaderEl) loaderEl.style.display = "none";
+        if (noteEl) {
+          noteEl.textContent = "まだ反映されていない可能性があります。少し時間をおいてから再読み込みしてください。";
+        }
+      }
+    };
+
+    check();
+  }
+
+  // ===================== PDF → JPEG（全ページを個別保存） =====================
+  const pdfToJpegInput = document.getElementById("pdfToJpegInput");
+  const pdfToJpegBtn = document.getElementById("pdfToJpegBtn");
+  const pdfToJpegStatus = document.getElementById("pdfToJpegStatus");
+
+  pdfToJpegBtn.addEventListener("click", async () => {
+    const file = pdfToJpegInput.files[0];
+    if (!file) {
+      alert("PDFファイルを選択してください。");
+      return;
+    }
+    if (!window['pdfjsLib']) {
+      alert("pdf.js ライブラリが読み込まれていません。");
+      return;
+    }
+
+    pdfToJpegBtn.disabled = true;
+    pdfToJpegStatus.textContent = "PDFを読み込み中…";
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pageCount = pdf.numPages;
+
+      for (let i = 1; i <= pageCount; i++) {
+        pdfToJpegStatus.textContent = `ページ ${i}/${pageCount} を変換中…`;
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2.0 });
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+        // JPEG Blob を生成
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", 0.92)
+        );
+
+        // 各ページを個別にダウンロード（ZIPは作らない）
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `page-${i}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      pdfToJpegStatus.textContent =
+        `すべてのページ（${pageCount}件）のJPEGをダウンロードしました。ブラウザのダウンロード一覧をご確認ください。`;
+
+    } catch (e) {
+      console.error(e);
+      pdfToJpegStatus.textContent = "変換中にエラーが発生しました。";
+    }
+
+    pdfToJpegBtn.disabled = false;
+  });
+
+  // ===================== 画像 → PDF =====================
+  const imgToPdfInput = document.getElementById("imgToPdfInput");
+  const imgToPdfBtn = document.getElementById("imgToPdfBtn");
+  const imgToPdfStatus = document.getElementById("imgToPdfStatus");
+
+  imgToPdfBtn.addEventListener("click", async () => {
+    const files = Array.from(imgToPdfInput.files || []);
+    if (!files.length) {
+      alert("画像ファイルを選択してください。");
+      return;
+    }
+    if (!window['jspdf']) {
+      alert("jsPDFライブラリが読み込まれていません。");
+      return;
+    }
+
+    imgToPdfBtn.disabled = true;
+    imgToPdfStatus.textContent = "画像を読み込み中…";
+
+    try {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      for (let index = 0; index < files.length; index++) {
+        const file = files[index];
+        imgToPdfStatus.textContent = `画像 ${index + 1}/${files.length} を処理中…`;
+
+        const imgData = await fileToDataURL(file);
+
+        if (index > 0) pdf.addPage();
+
+        const img = await loadImage(imgData);
+        const imgRatio = img.width / img.height;
+        const margin = 10;
+        let w = pageWidth - margin * 2;
+        let h = w / imgRatio;
+        if (h > pageHeight - margin * 2) {
+          h = pageHeight - margin * 2;
+          w = h * imgRatio;
+        }
+        const x = (pageWidth - w) / 2;
+        const y = (pageHeight - h) / 2;
+
+        pdf.addImage(imgData, "JPEG", x, y, w, h);
+      }
+
+      imgToPdfStatus.textContent = "PDFを生成中…";
+      pdf.save("images_to_pdf.pdf");
+      imgToPdfStatus.textContent = "PDFのダウンロードを開始しました。";
+
+    } catch (e) {
+      console.error(e);
+      imgToPdfStatus.textContent = "変換中にエラーが発生しました。";
+    }
+
+    imgToPdfBtn.disabled = false;
+  });
+
+  function fileToDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
   }
 </script>
 
