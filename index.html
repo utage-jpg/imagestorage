@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>GitHub ファイルURLメーカー</title>
+<style>
+  body {
+    margin: 0;
+    padding: 24px;
+    font-family: sans-serif;
+    background: #fafafa;
+    color: #222;
+    max-width: 600px;
+    margin: auto;
+  }
+
+  h1 {
+    font-size: 20px;
+    margin-bottom: 12px;
+  }
+
+  .desc {
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+
+  #tokenArea {
+    margin-bottom: 20px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+
+  #dropzone {
+    border: 2px dashed #999;
+    background: #fff;
+    padding: 40px 20px;
+    text-align: center;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    transition: background 0.2s;
+  }
+
+  #dropzone.dragover {
+    background: #e0f7ff;
+  }
+
+  #fileInput {
+    display: none;
+  }
+
+  button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    background: #222;
+    color: #fff;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-bottom: 12px;
+  }
+
+  button:disabled {
+    background: #777;
+  }
+
+  #result {
+    font-size: 13px;
+    margin-top: 16px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #ccc;
+    display: none;
+  }
+
+  .url-box {
+    margin-bottom: 10px;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+
+<h1>GitHub ファイルURLメーカー</h1>
+<p class="desc">
+  ファイルをドラッグ＆ドロップ、またはクリックして選択してください。<br>
+  GitHub（imagestorage）にアップロードし、URLを発行します。
+</p>
+
+<!-- 初回だけ表示（LocalStorageにtokenがない場合のみ） -->
+<div id="tokenArea" style="display:none;">
+  <p style="margin:0 0 6px;">GitHub パーソナルアクセストークン（初回のみ）</p>
+  <input id="tokenInput" type="password" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;"
+    placeholder="github_pat_..." />
+  <button onclick="saveToken()">保存して次へ進む</button>
+</div>
+
+<div id="dropzone">
+  <p>ここにファイルをドロップ<br>またはクリックして選択</p>
+  <input id="fileInput" type="file" />
+</div>
+
+<button id="uploadBtn" disabled>URL発行</button>
+
+<div id="result"></div>
+
+<script>
+  const OWNER = "utage-jpg";
+  const REPO = "imagestorage";
+  const BRANCH = "main";
+  const FOLDER = ""; // ルートにアップロード
+
+  let selectedFile = null;
+
+  // --- トークン管理 ---
+  const savedToken = localStorage.getItem("github_token");
+
+  const tokenArea = document.getElementById("tokenArea");
+  const uploadBtn = document.getElementById("uploadBtn");
+
+  if (!savedToken) {
+    tokenArea.style.display = "block"; // 初回表示
+  }
+
+  function saveToken() {
+    const token = document.getElementById("tokenInput").value.trim();
+    if (!token) return alert("トークンを入力してください");
+    localStorage.setItem("github_token", token);
+    tokenArea.style.display = "none";
+  }
+
+  // --- ドラッグ＆ドロップ ---
+  const dropzone = document.getElementById("dropzone");
+  const fileInput = document.getElementById("fileInput");
+
+  dropzone.addEventListener("click", () => fileInput.click());
+
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.classList.add("dragover");
+  });
+
+  dropzone.addEventListener("dragleave", () => {
+    dropzone.classList.remove("dragover");
+  });
+
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    handleFiles(e.dataTransfer.files);
+  });
+
+  fileInput.addEventListener("change", (e) => {
+    handleFiles(e.target.files);
+  });
+
+  function handleFiles(files) {
+    if (!files.length) return;
+    selectedFile = files[0];
+    uploadBtn.disabled = false;
+    dropzone.innerHTML = `<p>${selectedFile.name}</p>`;
+  }
+
+  // --- アップロード処理 ---
+  function arrayBufferToBase64(buffer) {
+    let binary = "";
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  uploadBtn.addEventListener("click", async () => {
+    const token = localStorage.getItem("github_token");
+    if (!token) return alert("トークンがありません（初回設定してください）");
+    if (!selectedFile) return alert("ファイルが選択されていません");
+
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = "アップロード中...";
+
+    try {
+      const arrayBuffer = await selectedFile.arrayBuffer();
+      const base64Content = arrayBufferToBase64(arrayBuffer);
+
+      const path = FOLDER + selectedFile.name;
+
+      const res = await fetch(
+        `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`,
+        {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Accept": "application/vnd.github+json"
+          },
+          body: JSON.stringify({
+            message: `Upload via Simple Tool: ${selectedFile.name}`,
+            content: base64Content,
+            branch: BRANCH
+          })
+        }
+      );
+
+      if (!res.ok) {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = "URL発行";
+        return alert("アップロードに失敗しました。トークン権限を確認してください。");
+      }
+
+      showResult(selectedFile.name);
+
+    } catch (e) {
+      alert("エラーが発生しました");
+      console.error(e);
+    }
+
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = "URL発行";
+  });
+
+  function showResult(filename) {
+    const raw = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${filename}`;
+    const pages = `https://${OWNER}.github.io/${REPO}/${filename}`;
+
+    const box = document.getElementById("result");
+    box.style.display = "block";
+    box.innerHTML = `
+      <div class="url-box"><strong>Raw URL:</strong><br>${raw}</div>
+      <div class="url-box"><strong>GitHub Pages URL:</strong><br>${pages}</div>
+    `;
+  }
+</script>
+
+</body>
+</html>
